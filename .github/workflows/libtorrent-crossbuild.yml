@@ -163,7 +163,7 @@ jobs:
           -D CMAKE_BUILD_TYPE="Release" \
           -D CMAKE_CXX_STANDARD="${{ env.cxx_standard }}" \
           -D BOOST_INCLUDEDIR="/root/boost_${{ env.boost_version }}/" \
-          -D CMAKE_INSTALL_PREFIX="/${{ env.opt_dir_name }}"
+          -D CMAKE_INSTALL_PREFIX=/root/build/${{ env.opt_dir_name }}"
 
       - name: Docker target - libtorrent - cmake build
         run: docker exec --env-file env.custom -w /root/libtorrent multiarch cmake --build build
@@ -173,6 +173,8 @@ jobs:
 
       - name: Docker target - Set full libtorrent version to variable using strings
         run: echo "libtorrent_version=$(strings -d build/${{ env.opt_dir_name }}/lib/libtorrent-rasterbar.so | sed -rn 's|^libtorrent/(.*)|\1|p' | head -n 1)" >> $GITHUB_ENV
+
+        /opt/local/lib/libtorrent-rasterbar.so
 
       - name: Host - Set libtorrent version to variable
         run: |
