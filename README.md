@@ -1,4 +1,4 @@
-# openssl crossbuilds
+# libtorrent crossbuilds
 
 Multiarch crossbuilds to use with Debian based platforms.
 
