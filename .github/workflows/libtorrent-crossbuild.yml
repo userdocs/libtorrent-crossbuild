@@ -174,8 +174,6 @@ jobs:
       - name: Docker target - Set full libtorrent version to variable using strings
         run: echo "libtorrent_version=$(strings -d build/${{ env.opt_dir_name }}/lib/libtorrent-rasterbar.so | sed -rn 's|^libtorrent/(.*)|\1|p' | head -n 1)" >> $GITHUB_ENV
 
-        /opt/local/lib/libtorrent-rasterbar.so
-
       - name: Host - Set libtorrent version to variable
         run: |
           libtorrent_version="$(<libtorrent.version)"
