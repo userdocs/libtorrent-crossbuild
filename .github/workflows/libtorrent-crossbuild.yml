@@ -171,13 +171,8 @@ jobs:
       - name: Docker target - libtorrent - cmake install
         run: docker exec --env-file env.custom -w /root/libtorrent multiarch cmake --install build
 
-      - name: Docker target - Set full libtorrent version to variable using strings
-        run: docker exec --env-file env.custom -w "/root/build/${{ env.opt_dir_name }}/lib" bintest bash -c 'strings -d libtorrent-rasterbar.so | sed -rn 's|^libtorrent/(.*)|\1|p' | head -n 1 > /root/${{ matrix.name }}.version'
-
-      - name: Host - Set libtorrent version to variable
-        run: |
-          libtorrent_version="$(<libtorrent.version)"
-          echo "libtorrent_version=${libtorrent_version}" >> $GITHUB_ENV
+      - name: Set full libtorrent version to variable using strings
+        run: echo "libtorrent_version=$(strings -d build/${{ env.opt_dir_name }}/lib/libtorrent-rasterbar.so | sed -rn 's|^libtorrent/(.*)|\1|p' | head -n 1)" >> $GITHUB_ENV
 
       - name: Host - Set deb dependencies for libtorrent
         run: echo "libtorrent-deb-deps=libtorrent" >> $GITHUB_ENV
