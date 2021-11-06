@@ -163,7 +163,7 @@ jobs:
           -D CMAKE_BUILD_TYPE="Release" \
           -D CMAKE_CXX_STANDARD="${{ env.cxx_standard }}" \
           -D BOOST_INCLUDEDIR="/root/boost_${{ env.boost_version }}/" \
-          -D CMAKE_INSTALL_PREFIX=/root/build/${{ env.opt_dir_name }}"
+          -D CMAKE_INSTALL_PREFIX="/root/build/${{ env.opt_dir_name }}"
 
       - name: Docker target - libtorrent - cmake build
         run: docker exec --env-file env.custom -w /root/libtorrent multiarch cmake --build build
