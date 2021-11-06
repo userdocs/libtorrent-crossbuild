@@ -106,7 +106,7 @@ jobs:
 
       - name: Docker target - apt-get install the core build dependencies
         run: |
-          docker exec --env-file env.custom multiarch apt-get install -y build-essential curl pkg-config automake libtool git perl python3 python3-dev openssl unzip ccache
+          docker exec --env-file env.custom multiarch apt-get install -y build-essential curl pkg-config automake libtool git perl python3 python3-dev unzip ccache
           docker exec --env-file env.custom bintest apt-get install -y openssl binutils
 
       - name: Docker target - apt-get install crossbuild-essential
@@ -115,7 +115,7 @@ jobs:
 
       - name: Docker target - apt-get install cross target deps
         run: |
-          docker exec --env-file env.custom multiarch apt-get install -y libstdc++-*-dev:${{ matrix.arch }}
+          docker exec --env-file env.custom multiarch apt-get install -y libstdc++-*-dev:${{ matrix.arch }} openssl:${{ matrix.arch }}
 
       - name: Docker target - bionic - apt-get install gcc-8-base g++-8
         if: matrix.arch == 'amd64' && matrix.os_version_id == 'bionic'
