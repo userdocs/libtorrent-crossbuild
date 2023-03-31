@@ -113,6 +113,8 @@ jobs:
           docker exec -w /home/github/libtorrent multiarch cmake -Wno-dev -Wno-deprecated -G Ninja -B build \
           -D CMAKE_BUILD_TYPE="Release" \
           -D CMAKE_CXX_STANDARD="${{ env.cxx_standard }}" \
+          -D CMAKE_CXX_STANDARD_REQUIRED=ON \
+          -D CMAKE_CXX_EXTENSIONS=OFF \
           -D BOOST_INCLUDEDIR="/home/github/boost_${{ env.boost_version }}/" \
           -D CMAKE_INSTALL_PREFIX="/home/github/build/${{ env.opt_dir_name }}"
 
@@ -182,7 +184,6 @@ jobs:
           done
 
       - name: Host - "Create release - tag - assets"
-        id: release_id
         uses: ncipollo/release-action@v1
         with:
           prerelease: false
@@ -206,4 +207,3 @@ jobs:
       - uses: actions/checkout@v3
       - name: Trigger rerun workflow on job failures
         run: gh workflow run rerun.yml -f run_id=${{ github.run_id }} -f attempts=${{ github.run_attempt }}
-
