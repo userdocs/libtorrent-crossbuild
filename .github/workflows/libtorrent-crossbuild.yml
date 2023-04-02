@@ -139,7 +139,8 @@ jobs:
       - name: Set full libtorrent version to variable using strings
         id: version_info
         run: |
-          echo "libtorrent_version=$(strings -d build/${{ env.opt_dir_name }}/lib/libtorrent-rasterbar.so | sed -rn 's|^libtorrent/(.*)|\1|p' | head -n 1)" >> $GITHUB_ENV      
+          libtorrent_version="$(strings -d build/${{ env.opt_dir_name }}/lib/libtorrent-rasterbar.so | sed -rn 's|^libtorrent/(.*)|\1|p' | head -n 1)"
+          echo "libtorrent_version=${libtorrent_version}" >> $GITHUB_ENV      
           echo "libtorrent_version=${libtorrent_version}" >> $GITHUB_OUTPUT
 
       - name: Host - Set deb dependencies for libtorrent
