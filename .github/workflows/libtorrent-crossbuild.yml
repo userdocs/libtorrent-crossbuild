@@ -31,7 +31,7 @@ jobs:
       matrix:
         name: [libtorrent]
         os_id: [debian, ubuntu]
-        os_codename: [stretch, buster, bullseye, bionic, focal, jammy]
+        os_codename: [buster, bullseye, bookworm, bionic, focal, jammy]
         arch: [amd64, armhf, arm64]
         exclude:
           - os_id: debian
@@ -41,12 +41,11 @@ jobs:
           - os_id: debian
             os_codename: jammy
           - os_id: ubuntu
-            os_codename: stretch
-          - os_id: ubuntu
             os_codename: buster
           - os_id: ubuntu
             os_codename: bullseye
-
+          - os_id: ubuntu
+            os_codename: bookworm
     name: ${{ matrix.os_id }}:${{ matrix.os_codename }} ${{ matrix.name }} ${{ matrix.arch }}
 
     env:
@@ -140,7 +139,7 @@ jobs:
         id: version_info
         run: |
           libtorrent_version="$(strings -d build/${{ env.opt_dir_name }}/lib/libtorrent-rasterbar.so | sed -rn 's|^libtorrent/(.*)|\1|p' | head -n 1)"
-          echo "libtorrent_version=${libtorrent_version}" >> $GITHUB_ENV      
+          echo "libtorrent_version=${libtorrent_version}" >> $GITHUB_ENV
           echo "libtorrent_version=${libtorrent_version}" >> $GITHUB_OUTPUT
 
       - name: Host - Set deb dependencies for libtorrent
