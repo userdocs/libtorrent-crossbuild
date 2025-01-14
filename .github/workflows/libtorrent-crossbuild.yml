@@ -144,7 +144,7 @@ jobs:
           docker exec -w /home/github/build/etc/ld.so.conf.d multiarch bash -c "echo '/${{ env.opt_dir_name }}/lib' > libtorrent.conf"
 
       - name: Host - Create deb packages
-        uses: jiro4989/build-deb-action@v3
+        uses: jiro4989/build-deb-action@v4
         with:
           package: "${{ matrix.name }}"
           package_root: build
