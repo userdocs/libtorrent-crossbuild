@@ -6,7 +6,7 @@ on:
       skip_rerun:
         description: "Skip rerun?"
         required: true
-        default: true
+        default: false
         type: boolean
       retries:
         description: "Number of rerun retries"
@@ -19,12 +19,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     outputs:
       libtorrent_version: ${{ steps.version_info.outputs.libtorrent_version }}
     strategy:
@@ -45,62 +46,41 @@ jobs:
             os_codename: bullseye
           - os_id: ubuntu
             os_codename: bookworm
+
     name: ${{ matrix.os_id }}:${{ matrix.os_codename }} ${{ matrix.name }} ${{ matrix.arch }}
 
     env:
       opt_dir_name: "opt/local"
       github_branch: "RC_2_0"
-      cxx_standard: "17"
-      GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      cxx_standard: "20"
+      GH_TOKEN: "${{ github.token }}"
 
     steps:
-      - name: Host - Checkout action
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      # Fix this bug https://github.com/actions/runner-images/issues/7192
-      - name: Host - phased updates
-        run: printf '%s\n' 'APT::Get::Always-Include-Phased-Updates "false";' | sudo tee /etc/apt/apt.conf.d/99-phased-updates
-
-      - name: Host - update
-        run: sudo apt-get update
-
-      - name: Host - upgrade
-        run: sudo apt-get -y upgrade
-
-      # No action or other method to bootstrap binfmt-support and qemu-user-static on the host runner
       - name: Host - set up qemu-user-static binfmt-support
         run: sudo apt install libpipeline1 qemu-user-static binfmt-support
 
-      # Why are we doing it like this and not using a container setup? That's how you're supposed to do it, right?
-      # qemu-user-static and binfmt-support are not part of the runner images https://github.com/actions/runner-images?tab=readme-ov-file#available-images
-      # We would need to modify the runner to install these before the container starts. Which you cannot do as there is no way to bootstrap the host.
-      # So we install them on the host then create/pull a custom docker image that we use to build the multiarch targets.
-      # We are always on the host runner but can use any docker image we need with the access the qemu emulation when required.
-      #
-      # We are using these pre configured toolchain images that allows me to remove 50% of the code/time from this action.
-      #
-      # https://github.com/userdocs/dcb/blob/main/Dockerfile
-      #
-      # The image does not run as root and has password-less sudo. There are two users username:1000 /home/username and github:1001 /home/github
-      # In the action it runs as 1001 /home/github and files should be available to the host. For local use, you might need -u 1000
-
       - name: Host - Create docker multiarch ${{ matrix.arch }} container
-        run: docker run --name multiarch -it -d -u 1001 -v ${{ github.workspace }}:/home/github ghcr.io/userdocs/dcb:${{ matrix.os_id }}-${{ matrix.os_codename }}-${{ matrix.arch }}
+        run: docker run --name multiarch -it -d -v ${{ github.workspace }}:/home/github ghcr.io/userdocs/dcb:${{ matrix.os_id }}-${{ matrix.os_codename }}-${{ matrix.arch }}
 
       - name: Docker - cmake and ninja download and install
         run: |
           docker exec multiarch curl -sNL "https://github.com/userdocs/cmake-crossbuild/releases/latest/download/${{ matrix.os_id }}-${{ matrix.os_codename }}-cmake-${{ matrix.arch }}.deb" -o ${{ matrix.os_id }}-${{ matrix.os_codename }}-cmake-${{ matrix.arch }}.deb
-          docker exec multiarch sudo dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-cmake-${{ matrix.arch }}.deb
+          docker exec multiarch dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-cmake-${{ matrix.arch }}.deb
 
       - name: Docker - zlib-ng download and install
         run: |
           docker exec multiarch curl -sNL "https://github.com/userdocs/zlib-ng-crossbuild/releases/latest/download/${{ matrix.os_id }}-${{ matrix.os_codename }}-zlib-ng-${{ matrix.arch }}.deb" -o ${{ matrix.os_id }}-${{ matrix.os_codename }}-zlib-ng-${{ matrix.arch }}.deb
-          docker exec multiarch sudo dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-zlib-ng-${{ matrix.arch }}.deb
+          docker exec multiarch dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-zlib-ng-${{ matrix.arch }}.deb
 
       - name: Docker - openssl download and install
         run: |
           docker exec multiarch curl -sNL "https://github.com/userdocs/openssl-crossbuild/releases/latest/download/${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb" -o ${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb
-          docker exec multiarch sudo dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb
+          docker exec multiarch dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb
 
       - name: Docker - Bootstrap the boost files
         run: |
@@ -114,7 +94,7 @@ jobs:
 
       - name: Docker - libtorrent - cmake configure
         run: >
-          docker exec -w /home/github/libtorrent multiarch cmake -Wno-dev -Wno-deprecated -G Ninja -B build
+          docker exec -u github:github -w /home/github/libtorrent multiarch cmake -Wno-dev -Wno-deprecated -G Ninja -B build
           -D CMAKE_BUILD_TYPE="Release"
           -D CMAKE_CXX_STANDARD="${{ env.cxx_standard }}"
           -D CMAKE_CXX_STANDARD_REQUIRED=ON
@@ -123,10 +103,10 @@ jobs:
           -D CMAKE_INSTALL_PREFIX="/home/github/build/${{ env.opt_dir_name }}"
 
       - name: Docker - libtorrent - cmake build
-        run: docker exec -w /home/github/libtorrent multiarch cmake --build build
+        run: docker exec -u github:github -w /home/github/libtorrent multiarch cmake --build build
 
       - name: Docker - libtorrent - cmake install
-        run: docker exec -w /home/github/libtorrent multiarch cmake --install build
+        run: docker exec -u github:github -w /home/github/libtorrent multiarch cmake --install build
 
       - name: Set full libtorrent version to variable using strings
         id: version_info
@@ -135,13 +115,10 @@ jobs:
           echo "libtorrent_version=${libtorrent_version}" >> $GITHUB_ENV
           echo "libtorrent_version=${libtorrent_version}" >> $GITHUB_OUTPUT
 
-      - name: Host - Set deb dependencies for libtorrent
-        run: echo "libtorrent-deb-deps=zlib-ng,openssl" >> $GITHUB_ENV
-
       - name: Docker - ldconfig - create /etc/ld.so.conf.d/libtorrent.conf
         run: |
-          docker exec -w /home/github/build multiarch mkdir -p etc/ld.so.conf.d
-          docker exec -w /home/github/build/etc/ld.so.conf.d multiarch bash -c "echo '/${{ env.opt_dir_name }}/lib' > libtorrent.conf"
+          docker exec -u github:github -w /home/github/build multiarch mkdir -p etc/ld.so.conf.d
+          docker exec -u github:github -w /home/github/build/etc/ld.so.conf.d multiarch bash -c "echo '/${{ env.opt_dir_name }}/lib' > libtorrent.conf"
 
       - name: Host - Create deb packages
         uses: jiro4989/build-deb-action@v4
@@ -151,7 +128,7 @@ jobs:
           maintainer: userdocs
           compress_type: gzip
           version: "${{ env.libtorrent_version }}"
-          depends: "${{ env.libtorrent-deb-deps }}"
+          depends: "zlib-ng,openssl"
           arch: "${{ matrix.arch }}"
           desc: "${{ matrix.name }}-${{ matrix.arch }} for ${{ matrix.os_id }}-${{ matrix.os_codename }}"
 
@@ -166,15 +143,17 @@ jobs:
 
   release:
     name: Upload artifacts to release
-    runs-on: ubuntu-latest
-    needs: build
-    if: always() && contains(needs.*.result, 'success') && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-24.04-arm
+    needs: [build]
+    if: needs.build.result == 'success'
     env:
       GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
       libtorrent_version: ${{ needs.build.outputs.libtorrent_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Host - Download artifacts
         uses: actions/download-artifact@v4
@@ -197,18 +176,30 @@ jobs:
           body: "libtorrent built from github master on amd64 arm64 armhf for Debian Bullseye Bookworm and Ubuntu Focal Jammy Noble"
           allowUpdates: true
 
-  rerun-on-failure:
-    if: failure() && inputs.skip_rerun == '0'
-    name: rerun-on-failure
-    needs: release
+  ci-auto-rerun-failed-jobs:
+    if: failure() && (github.event.inputs.skip_rerun || 'false') == 'false'
+    needs: [release]
+    concurrency:
+      group: ci-auto-rerun-failed-jobs
+      cancel-in-progress: true
     permissions:
       actions: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     env:
-      GH_TOKEN: "${{ github.TOKEN }}"
+      GH_TOKEN: "${{ secrets.AUTO_RERUN || github.token }}"
+      github_repo: "" # To use ci-auto-rerun-failed-jobs.yml hosted in a remote repository else default to the current repository. Requires PAT token AUTO_RERUN
+      retries: ${{ github.event.inputs.retries || '1' }}
+      distinct_id: ${{ github.event.inputs.distinct_id }}
     steps:
       - uses: actions/checkout@v4
-      - name: Trigger rerun workflow on job failures
-        run: |
-          inputs_retries="${{ inputs.retries }}"
-          gh workflow run rerun.yml -f run_id=${{ github.run_id }} -f attempts=${{ github.run_attempt }} -f retries=${inputs_retries:-1}
+        with:
+          persist-credentials: false
+      - name: ci-auto-rerun-failed-jobs via ${{ env.github_repo || github.repository }}
+        run: >
+          gh workflow run ci-auto-rerun-failed-jobs-action.yml
+          --repo "${github_repo:-$GITHUB_REPOSITORY}"
+          -f github_repo=${GITHUB_REPOSITORY}
+          -f run_id=${GITHUB_RUN_ID}
+          -f attempts=${GITHUB_RUN_ATTEMPT}
+          -f retries=${retries}
+          -f distinct_id=${distinct_id}
