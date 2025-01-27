@@ -87,7 +87,7 @@ jobs:
           boost_version="$(git ls-remote -q -t --refs https://github.com/boostorg/boost.git | awk '{sub("refs/tags/boost-", "");sub("(.*)(rc|alpha|beta|-bgl)(.*)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n1)"
 
           if curl -sfLI "https://github.com/boostorg/boost/releases/latest/download/boost-${boost_version}-b2-nodocs.tar.xz"; then
-            boost_url="https://github.com/boostorg/boost/releases/latest/download/boost-${boost_version}-b2-nodocs.tar.xz" && boost_repack="false"
+            boost_url="https://github.com/boostorg/boost/releases/latest/download/boost-${boost_version}-b2-nodocs.tar.xz" && boost_tar_xz="true"
           elif curl -sfLI "https://archives.boost.io/release/${boost_version}/source/boost_${boost_version//./_}.tar.gz" &> /dev/null; then
             boost_url="https://archives.boost.io/release/${boost_version}/source/boost_${boost_version//./_}.tar.gz"
           elif curl -sfLI "https://sourceforge.net/projects/boost/files/boost/${boost_version}/boost_${boost_version//./_}.tar.gz" &> /dev/null; then
@@ -99,10 +99,16 @@ jobs:
             exit 1
           fi
 
-          curl -sL "$boost_url" > boost.tar.gz
+          if [[ "$boost_tar_xz" == "true" ]]; then
+              curl -sL "$boost_url" > boost.tar.xz
+              printf '%s\n' "boost_folder_name=boost-${boost_version}" >> $GITHUB_ENV
+          else
+              curl -sL "$boost_url" > boost.tar.gz
+              boost_archive="boost.tar.xz"
+              printf '%s\n' "boost_folder_name=boost_${boost_version//./_}" >> $GITHUB_ENV
+          fi
 
-          tar xf "boost.tar.gz"
-          echo "boost_version=${boost_version//./_}" >> $GITHUB_ENV
+          tar xf "${boost_archive}"
 
       - name: Git clone libtorrent
         run: git clone --single-branch --branch "${{ env.github_branch }}" --shallow-submodules --recurse-submodules --depth 1 https://github.com/arvidn/libtorrent.git libtorrent
@@ -114,7 +120,7 @@ jobs:
           -D CMAKE_CXX_STANDARD="${{ env.cxx_standard }}"
           -D CMAKE_CXX_STANDARD_REQUIRED=ON
           -D CMAKE_CXX_EXTENSIONS=OFF
-          -D BOOST_INCLUDEDIR="/home/github/boost_${{ env.boost_version }}/"
+          -D BOOST_INCLUDEDIR="/home/github/${boost_folder_name}/"
           -D CMAKE_INSTALL_PREFIX="/home/github/build/${{ env.opt_dir_name }}"
 
       - name: Docker - libtorrent - cmake build
