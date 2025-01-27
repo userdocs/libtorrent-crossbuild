@@ -171,7 +171,7 @@ jobs:
     needs: [build]
     if: needs.build.result == 'success'
     env:
-      GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      GH_TOKEN: "${{ github.token }}"
       libtorrent_version: ${{ needs.build.outputs.libtorrent_version }}
     steps:
       - name: Checkout
