@@ -166,6 +166,8 @@ jobs:
   release:
     name: Upload artifacts to release
     runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
     needs: [build]
     if: needs.build.result == 'success'
     env:
