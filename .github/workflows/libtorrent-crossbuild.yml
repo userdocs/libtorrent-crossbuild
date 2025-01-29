@@ -83,38 +83,18 @@ jobs:
           docker exec multiarch dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb
 
       - name: Docker - Bootstrap the boost files
-        run: |
-          boost_version="$(git ls-remote -q -t --refs https://github.com/boostorg/boost.git | awk '{sub("refs/tags/boost-", "");sub("(.*)(rc|alpha|beta|-bgl)(.*)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n1)"
-
-          if curl -sfLI "https://github.com/boostorg/boost/releases/latest/download/boost-${boost_version}-b2-nodocs.tar.xz"; then
-            boost_url="https://github.com/boostorg/boost/releases/latest/download/boost-${boost_version}-b2-nodocs.tar.xz" && boost_tar_xz="true"
-          elif curl -sfLI "https://archives.boost.io/release/${boost_version}/source/boost_${boost_version//./_}.tar.gz" &> /dev/null; then
-            boost_url="https://archives.boost.io/release/${boost_version}/source/boost_${boost_version//./_}.tar.gz"
-          elif curl -sfLI "https://sourceforge.net/projects/boost/files/boost/${boost_version}/boost_${boost_version//./_}.tar.gz" &> /dev/null; then
-            boost_url="https://sourceforge.net/projects/boost/files/boost/${boost_version}/boost_${boost_version//./_}.tar.gz"
-          elif curl -sfLI "https://github.com/userdocs/boost/releases/download/boost-${boost_version}/boost_${boost_version//./_}.tar.gz" &> /dev/null; then
-            boost_url="https://github.com/userdocs/boost/releases/download/boost-${boost_version}/boost_${boost_version//./_}.tar.gz"
-          else
-            printf '%s\n' "Error: Unable to find a download link for Boost version: $boost_version"
-            exit 1
-          fi
-
-          if [[ "$boost_tar_xz" == "true" ]]; then
-              curl -sL "$boost_url" > boost.tar.xz
-              boost_archive_name="boost.tar.xz"
-              printf '%s\n' "boost_folder_name=boost-${boost_version}" >> $GITHUB_ENV
-          else
-              curl -sL "$boost_url" > boost.tar.gz
-              boost_archive_name="boost.tar.gz"
-              printf '%s\n' "boost_folder_name=boost_${boost_version//./_}" >> $GITHUB_ENV
-          fi
-
-          tar xf "${boost_archive_name}"
+        id: boost_info
+        uses: userdocs/actions/boost@main
+        with:
+          boost_version: ""
+          download_archive: true
 
       - name: Git clone libtorrent
         run: git clone --single-branch --branch "${{ env.github_branch }}" --shallow-submodules --recurse-submodules --depth 1 https://github.com/arvidn/libtorrent.git libtorrent
 
       - name: Docker - libtorrent - cmake configure
+        env:
+          boost_folder_name: ${{ steps.boost_info.outputs.BOOST_FOLDER_NAME }}
         run: >
           docker exec -u github:github -w /home/github/libtorrent multiarch cmake -Wno-dev -Wno-deprecated -G Ninja -B build
           -D CMAKE_BUILD_TYPE="Release"
