@@ -33,11 +33,9 @@ jobs:
       matrix:
         name: [libtorrent]
         os_id: [debian, ubuntu]
-        os_codename: [bullseye, bookworm, focal, jammy, noble]
+        os_codename: [bullseye, bookworm, trixie, jammy, noble]
         arch: [amd64, armhf, arm64]
         exclude:
-          - os_id: debian
-            os_codename: focal
           - os_id: debian
             os_codename: jammy
           - os_id: debian
@@ -46,6 +44,8 @@ jobs:
             os_codename: bullseye
           - os_id: ubuntu
             os_codename: bookworm
+          - os_id: ubuntu
+            os_codename: trixie
 
     name: ${{ matrix.os_id }}:${{ matrix.os_codename }} ${{ matrix.name }} ${{ matrix.arch }}
 
@@ -54,6 +54,7 @@ jobs:
       github_branch: "RC_2_0"
       cxx_standard: "17"
       GH_TOKEN: "${{ github.token }}"
+      container_name: "builder"
 
     steps:
       - name: Checkout
@@ -62,25 +63,33 @@ jobs:
           persist-credentials: false
 
       - name: Host - Bootstrap qemu
-        uses: userdocs/actions/qemu@main
+        uses: userdocs/actions/qemu@e74d179578ddcf1cd07cd9eefd0915f33a3bd600 # v1.0.1
 
-      - name: Host - Create docker multiarch ${{ matrix.arch }} container
-        run: docker run --name multiarch -it -d -v ${{ github.workspace }}:/home/github ghcr.io/userdocs/dcb:${{ matrix.os_id }}-${{ matrix.os_codename }}-${{ matrix.arch }}
+      - uses: userdocs/actions/qbt_docker@main
+        with:
+            # if the env.custom file exists, it will be used to pass environment
+            distinct_id: ""
+            use_host_env: "false"
+            container_name: ${{ env.container_name }}
+            os_id: ghcr.io/userdocs/dcb
+            os_version_id: ${{ matrix.os_id }}-${{ matrix.os_codename }}-${{ matrix.arch }}
+            uid: gh
+            gid: gh
 
       - name: Docker - cmake and ninja download and install
         run: |
-          docker exec multiarch curl -sNL "https://github.com/userdocs/cmake-crossbuild/releases/latest/download/${{ matrix.os_id }}-${{ matrix.os_codename }}-cmake-${{ matrix.arch }}.deb" -o ${{ matrix.os_id }}-${{ matrix.os_codename }}-cmake-${{ matrix.arch }}.deb
-          docker exec multiarch dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-cmake-${{ matrix.arch }}.deb
+          docker exec ${container_name} curl -sNL "https://github.com/userdocs/cmake-crossbuild/releases/latest/download/${{ matrix.os_id }}-${{ matrix.os_codename }}-cmake-${{ matrix.arch }}.deb" -o ${{ matrix.os_id }}-${{ matrix.os_codename }}-cmake-${{ matrix.arch }}.deb
+          docker exec ${container_name} sudo dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-cmake-${{ matrix.arch }}.deb
 
       - name: Docker - zlib-ng download and install
         run: |
-          docker exec multiarch curl -sNL "https://github.com/userdocs/zlib-ng-crossbuild/releases/latest/download/${{ matrix.os_id }}-${{ matrix.os_codename }}-zlib-ng-${{ matrix.arch }}.deb" -o ${{ matrix.os_id }}-${{ matrix.os_codename }}-zlib-ng-${{ matrix.arch }}.deb
-          docker exec multiarch dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-zlib-ng-${{ matrix.arch }}.deb
+          docker exec ${container_name} curl -sNL "https://github.com/userdocs/zlib-ng-crossbuild/releases/latest/download/${{ matrix.os_id }}-${{ matrix.os_codename }}-zlib-ng-${{ matrix.arch }}.deb" -o ${{ matrix.os_id }}-${{ matrix.os_codename }}-zlib-ng-${{ matrix.arch }}.deb
+          docker exec ${container_name} dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-zlib-ng-${{ matrix.arch }}.deb
 
       - name: Docker - openssl download and install
         run: |
-          docker exec multiarch curl -sNL "https://github.com/userdocs/openssl-crossbuild/releases/latest/download/${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb" -o ${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb
-          docker exec multiarch dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb
+          docker exec ${container_name} curl -sNL "https://github.com/userdocs/openssl-crossbuild/releases/latest/download/${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb" -o ${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb
+          docker exec ${container_name} dpkg -i ${{ matrix.os_id }}-${{ matrix.os_codename }}-openssl-${{ matrix.arch }}.deb
 
       - name: Docker - Bootstrap the boost files
         id: boost_info
@@ -97,19 +106,19 @@ jobs:
         env:
           boost_folder_name: ${{ steps.boost_info.outputs.BOOST_FOLDER_NAME }}
         run: >
-          docker exec -u github:github -w /home/github/libtorrent multiarch cmake -Wno-dev -Wno-deprecated -G Ninja -B build
+          docker exec -w /home/gh/libtorrent ${container_name} cmake -Wno-dev -Wno-deprecated -G Ninja -B build
           -D CMAKE_BUILD_TYPE="Release"
           -D CMAKE_CXX_STANDARD="${{ env.cxx_standard }}"
           -D CMAKE_CXX_STANDARD_REQUIRED=ON
           -D CMAKE_CXX_EXTENSIONS=OFF
-          -D BOOST_INCLUDEDIR="/home/github/${boost_folder_name}/"
-          -D CMAKE_INSTALL_PREFIX="/home/github/build/${{ env.opt_dir_name }}"
+          -D BOOST_INCLUDEDIR="/home/gh/${boost_folder_name}/"
+          -D CMAKE_INSTALL_PREFIX="/home/gh/build/${{ env.opt_dir_name }}"
 
       - name: Docker - libtorrent - cmake build
-        run: docker exec -u github:github -w /home/github/libtorrent multiarch cmake --build build
+        run: docker exec -w /home/gh/libtorrent ${container_name} cmake --build build
 
       - name: Docker - libtorrent - cmake install
-        run: docker exec -u github:github -w /home/github/libtorrent multiarch cmake --install build
+        run: docker exec -w /home/gh/libtorrent ${container_name} cmake --install build
 
       - name: Set full libtorrent version to variable using strings
         id: version_info
@@ -120,8 +129,8 @@ jobs:
 
       - name: Docker - ldconfig - create /etc/ld.so.conf.d/libtorrent.conf
         run: |
-          docker exec -u github:github -w /home/github/build multiarch mkdir -p etc/ld.so.conf.d
-          docker exec -u github:github -w /home/github/build/etc/ld.so.conf.d multiarch bash -c "echo '/${{ env.opt_dir_name }}/lib' > libtorrent.conf"
+          docker exec -w /home/gh/build ${container_name} mkdir -p etc/ld.so.conf.d
+          docker exec -w /home/gh/build/etc/ld.so.conf.d ${container_name} bash -c "echo '/${{ env.opt_dir_name }}/lib' > libtorrent.conf"
 
       - name: Host - Create deb packages
         uses: jiro4989/build-deb-action@v4
