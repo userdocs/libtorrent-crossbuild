@@ -58,7 +58,7 @@ jobs:
 
     steps:
       - name: Host - Checkout action
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
@@ -90,7 +90,7 @@ jobs:
 
       - name: Docker - Bootstrap the boost files
         id: boost_info
-        uses: userdocs/actions/boost@55c571b38f7c9a43434a44fe60a9a55796ef072e # main
+        uses: userdocs/actions/boost@6101859bf7d57bcee8e4aea748a1b50d8f9a0e14 # main
         with:
           boost_version: ""
           download_archive: true
@@ -162,7 +162,7 @@ jobs:
       libtorrent_version: ${{ needs.build.outputs.libtorrent_version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
@@ -202,7 +202,7 @@ jobs:
       retries: ${{ github.event.inputs.retries || '1' }}
       distinct_id: ${{ github.event.inputs.distinct_id }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
       - name: ci-auto-rerun-failed-jobs via ${{ env.github_repo || github.repository }}
